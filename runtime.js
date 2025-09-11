@@ -1,5 +1,7 @@
 import classNames from "classnames";
 
+import { components } from "./index.js";
+
 export const jsxs = jsx;
 
 export function createElement(type, props, ...children) {
@@ -15,13 +17,20 @@ export async function jsx(type, props = {}, key) {
 }
 
 
-async function renderChildren(input) {
+async function renderChildren2(input) {
   const result = [];
+
   async function walk(node) {
     const value = await node;
-    if (value == null || value === false || value === true) return;
+    if (value == null || value === false || value === true) {
+      return;
+    }
+
     if (Array.isArray(value)) {
-      await Promise.all(value.map(walk));
+      // Process array items sequentially to preserve order
+      for (const item of value) {
+        await walk(item);
+      }
     } else {
       result.push(String(value));
     }
@@ -30,8 +39,28 @@ async function renderChildren(input) {
   return result.join("");
 }
 
+async function renderChildren(children,ctx={}) {
+  let childStr = "";
+  for (let child of [].concat(children).flat(Infinity)) {
+    if (typeof child === 'function') {
+      child = await renderChildren(await child({}, ctx),ctx);
+    } else {
+      child = await Promise.resolve(child);
+    }
+    if (typeof child === 'boolean') {
+      child = '';
+    }
+    child = String(child ?? '');
+    childStr += child ?? '';
+  }
+  return childStr;
+}
+
 export async function renderElement(type, { children, ...props } = {}, ctx = {}) {
-  const comps = ctx.__components || {};
+  if (!type) {
+     throw new Error(`Invalid element type: ${type}`);
+  }
+  ctx = { ...ctx, ...components };
   try {
     for (const key in props) {
       if (typeof props[key] === "function") {
@@ -40,10 +69,10 @@ export async function renderElement(type, { children, ...props } = {}, ctx = {})
         props[key] = await props[key];
       }
     }
-    const childStr = await renderChildren(children);
+    const childStr = await renderChildren(children,ctx);
 
     if (typeof type === "function") {
-      let result = await type({ ...props, children }, ctx);
+      let result = await type({ ...props, children: childStr }, ctx);
       result = await renderChildren(result);
       return result;
     }
@@ -57,9 +86,9 @@ export async function renderElement(type, { children, ...props } = {}, ctx = {})
       })
       .join("");
 
-    return `<${type}${attrStr}>${childStr}</${type}>`;
+    return `<${type}${attrStr}>${childStr}</${type}>\n`;
   } catch (err) {
-    const ErrorComp = comps.ErrorMessage || (({ error }) => `<pre>${error}</pre>`);
+    const ErrorComp = ctx.ErrorMessage || (({ error }) => `<pre>${error}</pre>`);
     return await renderElement(ErrorComp, { error: err, template: type?.name }, ctx);
   }
 }

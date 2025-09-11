@@ -20,10 +20,21 @@ export default async ({
 import { renderElement } from "./runtime.js";
 
 
-const components = {};
+export const components = {};
 const moduleCache = {};
 
+const specialKeys = new Set(['req', 'res', 'query']);
+
 async function preloadTemplates(router, directory, context={}) {
+
+  for (const key in context) {
+    // only allow non-capitalized, non-special keys
+    if (specialKeys.has(key) || key[0] === key[0].toUpperCase()) {
+      throw new Error(`Context key "${key}" is not allowed. Context keys must not start with a capital letter and must not be one of: ${[...specialKeys].join(', ')}`);
+    }
+  }
+   
+
   const files = await fs.readdir(directory, {
     recursive: true,
     withFileTypes: true
@@ -36,14 +47,22 @@ async function preloadTemplates(router, directory, context={}) {
   for (const file of templateFiles) {
     const fullPath = path.join(file.parentPath, file.name);
     const name = path.basename(file.name, '.jsx');
+
+    // skip if not capitalized
+    if (name[0] !== name[0].toUpperCase()) {
+      console.log(`Skipping non-capitalized template: ${name}`);
+      continue;
+    }
+
     if (name in components) {
       throw new Error(`Duplicate template name found: "${name}". Template names must be unique across all directories.`);
     }
-    const module = await loadTemplate(fullPath, name);
+    const module = await loadModule(fullPath, name);
     moduleCache[name] = module;
     components[name] = module.default;
 
     if (module.route) {
+      // this module is a page
       const handler = renderPage(module, context);
       for (const r of [].concat(module.route)) {
         console.log(`Registering route: ${r} -> ${name}`);
@@ -54,8 +73,7 @@ async function preloadTemplates(router, directory, context={}) {
 }
 
 
-async function loadTemplate(filePath, name) {
-  console.log(`Loading template: ${name}`);
+async function loadModule(filePath) {
   const source = await fs.readFile(filePath, "utf8");
 
   let { code } = await esbuild.transform(source, {
@@ -64,7 +82,7 @@ async function loadTemplate(filePath, name) {
     loader: "jsx",
     jsxFactory: "jsx",
     jsxFragment: "Fragment",
-    jsxImportSource: "noxt-js",
+    jsxImportSource: "noxt-js-middleware",
   });
 
   const modulePath = filePath + ".mjs";
@@ -80,13 +98,12 @@ async function loadTemplate(filePath, name) {
 function renderPage(module, context={}) {
   return async function (req, res) {
     const props = { ...req.params };
-    const ctx = { ...context, req, res, query: req.query };
-    // load data if defined
+    const ctx = { ...components, ...context, req, res, query: req.query };
     try {
-      if (module.data) {
-        let data = typeof module.data === 'function'
+      if (module.params) {
+        let data = typeof module.params === 'function'
           ? await module.data(props, ctx)
-          : module.data;
+          : module.params;
 
         for (const [key, func] of Object.entries(data)) {
           if (typeof func === 'function') {
@@ -105,5 +122,5 @@ function renderPage(module, context={}) {
 
 export const renderWithLayout = async (name, props, ctx, layout) => {
   const children = await renderElement(name, props, ctx);
-  return await renderElement(layout ?? components.Layout, { ...props, children }, ctx);
+  return await renderElement(components[layout] ?? components.Layout, { ...props, children }, ctx);
 }
