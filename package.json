@@ -1,8 +1,10 @@
 {
   "name": "noxt-js-middleware",
+  "author": "Zoran Obradović",
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
+  "repository": "https://github.com/zocky/noxt-js-middleware",
   "exports": {
     ".": "./index.js",
     "./jsx-runtime": "./jsx-runtime.js",
@@ -23,7 +25,9 @@
     "express",
     "jsx",
     "router",
+    "async",
+    "ssr",
     "noxt"
   ],
-  "license": "MIT"
+  "license": "LGPL-3.0-or-later"
 }
