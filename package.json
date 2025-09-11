@@ -1,0 +1,29 @@
+{
+  "name": "noxt-js-middleware",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./jsx-runtime": "./jsx-runtime.js",
+    "./jsx-dev-runtime": "./jsx-dev-runtime.js"
+  },
+  "description": "A lightweight JSX-powered router for Express. Does not depend on React.",
+  "peerDependencies": {
+    "express": "^4 || ^5",
+    "esbuild": ">=0.21.0",
+    "classnames": ">=2.5.1"
+  },
+  "devDependencies": {
+    "express": "^5.1.0",
+    "esbuild": "^0.21.0",
+    "classnames": "^2.5.1"
+  },
+  "keywords": [
+    "express",
+    "jsx",
+    "router",
+    "noxt"
+  ],
+  "license": "MIT"
+}
