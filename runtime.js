@@ -5,7 +5,7 @@ import { components } from "./index.js";
 export const jsx = renderElement;
 export const jsxs = renderElement;
 export const jsxDEV = renderElement;
-export const Fragment = children => children;
+export const Fragment = ({children}) => children;
 
 export function createElement(type, props, ...children) {
   return jsx(type, { ...props, children });

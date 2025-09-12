@@ -18,12 +18,14 @@ export default async ({
   for (const dir of directories) {
     await preloadTemplates(router, dir, context);
   }
+  Object.assign(components, context);
   return router;
 }
 import { renderElement } from "./runtime.js";
 
 
 export const components = {};
+export const appContext = {};
 const moduleCache = {};
 
 const specialKeys = new Set(['req', 'res', 'query']);
