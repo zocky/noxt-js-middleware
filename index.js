@@ -4,7 +4,7 @@ import fs from "fs/promises";
 import { pathToFileURL } from "url";
 import path from 'path';
 
-import { Router } from "express"; 
+import { Router } from "express";
 import esbuild from "esbuild";
 
 export { createElement } from "./runtime.js";
@@ -48,7 +48,7 @@ export function registerPageExportHandler(name, loader) {
   exportLoaders[name] = loader;
 }
 
-async function preloadTemplates(router, directory, context={}) {
+async function preloadTemplates(router, directory, context = {}) {
 
   for (const key in context) {
     // only allow non-capitalized, non-special keys
@@ -117,7 +117,7 @@ async function loadModule(filePath) {
   return module;
 }
 
-function renderPage(module, context={}) {
+function renderPage(module, context = {}) {
   return async function (req, res) {
     const props = { ...req.params };
     const ctx = { ...components, ...context, req, res, query: req.query };
@@ -128,7 +128,12 @@ function renderPage(module, context={}) {
           await exportLoaders[id](module[id], props, ctx);
         }
       }
-      res.send(await renderWithLayout(module.default, props, ctx, module.layout));
+      const handler = module[req.method.toUpperCase()] ?? module.default;
+      if (!handler) {
+        res.status(405).send("Method not allowed");
+        return;
+      }
+      res.send(await renderWithLayout(handler, props, ctx, module.layout));
     } catch (e) {
       res.status(500).send(await renderWithLayout(components.ErrorMessage, { error: e, template: module.name }, ctx));
     }
@@ -138,6 +143,52 @@ function renderPage(module, context={}) {
 
 
 export const renderWithLayout = async (name, props, ctx, layout) => {
-  const children = await renderElement(name, props, ctx);
-  return await renderElement(components[layout] ?? components.Layout, { ...props, children }, ctx);
+  const content = await renderElement(name, props, ctx);
+  const children = await renderElement(components[layout] ?? components.Layout, { ...props, children: content }, ctx);
+  return await renderFinal(children,ctx);
+}
+
+function escapeHTML(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function armorHTML(str) {
+  return { html: str }
+}
+
+
+async function renderFinalChild(child,ctx={}) {
+  if (child == null) {
+    return '';
+  }
+  if (Array.isArray(child)) {
+    return await renderFinal(child,ctx);
+  }
+  switch (typeof child) {
+    case 'function':
+      return await renderFinal(await child({}, ctx),ctx);
+    case 'boolean':
+      return '';
+    case 'object':
+      if ('html' in child) {
+        return child.html;
+      }
+      return String(child);
+    default:
+      return escapeHTML(String(child));
+  }
+}
+
+async function renderFinal(children,ctx={}) {
+  let output = "";
+  children = [].concat(children).flat(Infinity);
+  for (let child of children) {
+    output += await renderFinalChild(await child,ctx);
+  }
+  return output;
 }
