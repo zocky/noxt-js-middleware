@@ -67,7 +67,7 @@ async function preloadTemplates(router, directory, context = {}) {
   );
 
   for (const file of templateFiles) {
-    const fullPath = path.join(file.parentPath, file.name);
+    const fullPath = path.join(file.parentPath ?? file.path, file.name);
     const name = path.basename(file.name, '.jsx');
 
     // skip if not capitalized
