@@ -14,7 +14,10 @@ export default async ({
   context = {},
 } = {}) => {
   const router = Router();
-  await preloadTemplates(router, directory, context);
+  let directories = [].concat(directory).flat();
+  for (const dir of directories) {
+    await preloadTemplates(router, dir, context);
+  }
   return router;
 }
 import { renderElement } from "./runtime.js";
@@ -25,6 +28,26 @@ const moduleCache = {};
 
 const specialKeys = new Set(['req', 'res', 'query']);
 
+const exportLoaders = {
+  params: async (value, props, ctx) => {
+    if (typeof value === 'function') {
+      Object.assign(props, await value(props, ctx));
+      return;
+    }
+    for (const [key, func] of Object.entries(value)) {
+      if (typeof func === 'function') {
+        props[key] = await func(props, ctx);
+      } else {
+        props[key] = func;
+      }
+    }
+  }
+}
+
+export function registerPageExportHandler(name, loader) {
+  exportLoaders[name] = loader;
+}
+
 async function preloadTemplates(router, directory, context={}) {
 
   for (const key in context) {
@@ -33,7 +56,6 @@ async function preloadTemplates(router, directory, context={}) {
       throw new Error(`Context key "${key}" is not allowed. Context keys must not start with a capital letter and must not be one of: ${[...specialKeys].join(', ')}`);
     }
   }
-   
 
   const files = await fs.readdir(directory, {
     recursive: true,
@@ -99,16 +121,11 @@ function renderPage(module, context={}) {
   return async function (req, res) {
     const props = { ...req.params };
     const ctx = { ...components, ...context, req, res, query: req.query };
-    try {
-      if (module.params) {
-        let data = typeof module.params === 'function'
-          ? await module.data(props, ctx)
-          : module.params;
 
-        for (const [key, func] of Object.entries(data)) {
-          if (typeof func === 'function') {
-            props[key] = await func(props, ctx);
-          }
+    try {
+      for (const id in exportLoaders) {
+        if (id in module) {
+          await exportLoaders[id](module[id], props, ctx);
         }
       }
       res.send(await renderWithLayout(module.default, props, ctx, module.layout));

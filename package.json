@@ -1,6 +1,6 @@
 {
   "name": "noxt-js-middleware",
-  "author": "Zoran Obradović",
+  "author": "Zoran Obradović [https://github.com/zocky]",
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
