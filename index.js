@@ -21,11 +21,8 @@ export default async ({
   Object.assign(components, context);
   return router;
 }
-import { renderElement } from "./runtime.js";
-
 
 export const components = {};
-export const appContext = {};
 const moduleCache = {};
 
 const specialKeys = new Set(['req', 'res', 'query']);
@@ -143,12 +140,19 @@ function renderPage(module, context = {}) {
 }
 // Express middleware to render a template with optional layout
 
-
 export const renderWithLayout = async (name, props, ctx, layout) => {
-  const content = await renderElement(name, props, ctx);
-  const children = await renderElement(components[layout] ?? components.Layout, { ...props, children: content }, ctx);
-  return await renderFinal(children,ctx);
-}
+  // build AST for the inner page
+  const pageAst = typeof name === 'function'
+    ? await name(props, ctx)          // page component already executed
+    : { type: name, props };          // element AST
+
+  // build AST for the layout, injecting pageAst as `children`
+  const layoutName = components[layout] ?? components.Layout;
+  const layoutAst = { type: layoutName, props: { ...props, children: pageAst } };
+
+  // single walk produces the final string
+  return renderNode(layoutAst, ctx);
+};
 
 function escapeHTML(str) {
   return String(str)
@@ -159,38 +163,43 @@ function escapeHTML(str) {
     .replace(/'/g, '&#39;');
 }
 
-function armorHTML(str) {
-  return { html: str }
+async function renderNode(node, ctx) {
+  if (node == null) return '';
+  if (Array.isArray(node)) {
+    let out = '';
+    for (const n of node) out += await renderNode(n, ctx);
+    return out;
+  }
+  if (typeof node === 'string' || typeof node === 'number') return escapeHTML(String(node));
+  if (typeof node === 'boolean') return '';
+  if (node.html) return node.html;                 // raw HTML chunk
+
+  // AST node: { type, props }
+  const { type, props = {} } = node;
+  const { children, ...rest } = props;
+
+  // resolve props (functions, promises, className)
+  for (const k in rest) {
+    if (typeof rest[k] === 'function') rest[k] = await rest[k]({}, ctx);
+    else if (rest[k]?.then) rest[k] = await rest[k];
+    if (k === 'class') rest[k] = (await import('classnames')).default(rest[k]);
+  }
+
+  if (typeof type === 'function') {                // component
+    const rendered = await type({ ...rest, children }, ctx);
+    return await renderNode(rendered, ctx);
+  }
+
+  // plain element
+  let attr = '';
+  for (const [k, v] of Object.entries(rest)) {
+    if (v == null || v === false) continue;
+    if (v === true) { attr += ` ${k}`; continue; }
+    attr += ` ${k}="${escapeHTML(String(v))}"`;
+  }
+  const open = `<${type}${attr}>`;
+  const close = `</${type}>`;
+  const kids = await renderNode(children, ctx);
+  return open + kids + close;
 }
 
-
-async function renderFinalChild(child,ctx={}) {
-  if (child == null) {
-    return '';
-  }
-  if (Array.isArray(child)) {
-    return await renderFinal(child,ctx);
-  }
-  switch (typeof child) {
-    case 'function':
-      return await renderFinal(await child({}, ctx),ctx);
-    case 'boolean':
-      return '';
-    case 'object':
-      if ('html' in child) {
-        return child.html;
-      }
-      return String(child);
-    default:
-      return escapeHTML(String(child));
-  }
-}
-
-async function renderFinal(children,ctx={}) {
-  let output = "";
-  children = [].concat(children).flat(Infinity);
-  for (let child of children) {
-    output += await renderFinalChild(await child,ctx);
-  }
-  return output;
-}
