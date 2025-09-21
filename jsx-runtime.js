@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "./runtime.js";
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "./src/runtime.js";
 
 export { _jsx as jsx, _jsxs as jsxs, _Fragment as Fragment };
 

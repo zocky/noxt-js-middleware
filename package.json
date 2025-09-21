@@ -6,7 +6,7 @@
   "main": "index.js",
   "repository": "https://github.com/zocky/noxt-js-middleware",
   "exports": {
-    ".": "./index.js",
+    ".": "./noxt-js-middleware.js",
     "./jsx-runtime": "./jsx-runtime.js",
     "./jsx-dev-runtime": "./jsx-dev-runtime.js"
   },
