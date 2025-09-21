@@ -13,13 +13,11 @@
   "description": "A lightweight JSX-powered router for Express. Does not depend on React.",
   "peerDependencies": {
     "express": "^4 || ^5",
-    "esbuild": ">=0.21.0",
-    "classnames": ">=2.5.1"
+    "esbuild": ">=0.21.0"
   },
   "devDependencies": {
     "express": "^5.1.0",
-    "esbuild": "^0.21.0",
-    "classnames": "^2.5.1"
+    "esbuild": "^0.21.0"
   },
   "keywords": [
     "express",
