@@ -3,6 +3,8 @@ import fs from "fs/promises";
 import path from "path";
 import { pathToFileURL } from "url";
 
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
 export async function loadModules(directories, modules = {}) {
 
   directories = [].concat(directories).flat();
@@ -38,23 +40,34 @@ export async function loadModules(directories, modules = {}) {
 
 
 async function loadModule(filePath) {
-  const source = await fs.readFile(filePath, "utf8");
+  try {
+    const source = await fs.readFile(filePath, "utf8");
 
-  let { code } = await esbuild.transform(source, {
-    target: 'ES2020',
-    jsx: 'automatic',
-    loader: "jsx",
-    jsxFactory: "jsx",
-    jsxFragment: "Fragment",
-    jsxImportSource: "noxt-js-middleware",
-  });
+    let { code } = await esbuild.transform(source, {
+      target: 'ES2020',
+      jsx: 'automatic',
+      loader: "jsx",
+      jsxFactory: "jsx",
+      jsxFragment: "Fragment",
+      jsxImportSource: "###",
+    });
 
-  const modulePath = filePath + ".mjs";
-  // Wrap in runtime imports
-  const moduleUrl = pathToFileURL(modulePath).href + "?update=" + Date.now();
-  await fs.writeFile(modulePath, `${code}`, { encoding: "utf8" });
-  const module = await import(moduleUrl);
-  // Clean up the temporary file
-  await fs.unlink(modulePath);
-  return module;
+    // there must be a less stupid way
+    const realRuntime = path.resolve(__dirname, "..", "jsx-runtime.js");
+
+    // chop off the first line from code
+    const firstNewlineIndex = code.indexOf("\n");
+    const firstLine = code.slice(0, firstNewlineIndex).replace("###/jsx-runtime", realRuntime);
+    code = firstLine + '\n' + code.slice(firstNewlineIndex);
+    const modulePath = filePath + ".mjs";
+    // Wrap in runtime imports
+    const moduleUrl = pathToFileURL(modulePath).href + "?update=" + Date.now();
+    await fs.writeFile(modulePath, `${code}`, { encoding: "utf8" });
+    const module = await import(moduleUrl);
+    // Clean up the temporary file
+    await fs.unlink(modulePath);
+    return module;
+  } catch (e) {
+    throw new Error(`[noxt] Error loading module ${filePath}: ${e.message}`);
+  }
 }

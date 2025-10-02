@@ -46,7 +46,7 @@ export async function renderNode(rootNode, ctx) {
         target.push(esc(String(node)));
         continue;
       }
-      if (node.html) {
+      if ('html' in node) {
         target.push(node.html);
         continue;
       }
@@ -98,6 +98,10 @@ export async function renderNode(rootNode, ctx) {
         continue;
       }
 
+      if (!type) {
+       target.push('<noxt-error>'+JSON.stringify(node)+'</noxt-error>');
+       continue;
+      }
 
       // elements
       const kidsBufId = ++bufIdSeq;
